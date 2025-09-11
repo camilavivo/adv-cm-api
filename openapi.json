@@ -1,0 +1,74 @@
+{
+  "openapi": "3.1.0",
+  "info": { "title": "ADV CM Filler API", "version": "1.0.0" },
+  "servers": [{ "url": "https://SUA-URL-DA-API" }],
+  "paths": {
+    "/fill": {
+      "post": {
+        "operationId": "preencherCM",
+        "summary": "Preenche o formulário CM e retorna o DOCX",
+        "security": [{ "ApiKeyAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CMPayload" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "DOCX preenchido",
+            "content": {
+              "application/vnd.openxmlformats-officedocument.wordprocessingml.document": {
+                "schema": { "type": "string", "format": "binary" }
+              }
+            }
+          },
+          "401": { "description": "API key inválida" }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "operationId": "health",
+        "responses": { "200": { "description": "OK" } }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "ApiKeyAuth": { "type": "apiKey", "in": "header", "name": "x-api-key" }
+    },
+    "schemas": {
+      "CMPayload": {
+        "type": "object",
+        "required": ["data","solicitante","departamento","situacao_atual","alteracao_proposta","abrangencia","classificacao","justificativa_classificacao"],
+        "properties": {
+          "data": { "type": "string" },
+          "solicitante": { "type": "string" },
+          "departamento": { "type": "string" },
+          "situacao_atual": { "type": "string" },
+          "alteracao_proposta": { "type": "string" },
+          "descricoes_itens": { "type": "array", "items": { "type": "string" } },
+          "numeros_correspondentes": { "type": "array", "items": { "type": "string" } },
+          "abrangencia": { "type": "string" },
+          "titulo_mudanca": { "type": "string" },
+          "caracter_mudanca": { "type": "string", "enum": ["Temporária","Definitiva"] },
+          "retorno_mudanca_temp": { "type": "string" },
+          "mudanca_refere_se": { "type": "array", "items": { "type": "string" } },
+          "impactos": { "type": "array", "items": { "type": "string" } },
+          "classificacao": { "type": "string", "enum": ["CRÍTICA","MAIOR","MENOR"] },
+          "justificativa_classificacao": { "type": "string" },
+          "anexos_aplicaveis": { "type": "array", "items": { "type": "string" } },
+          "departamentos_pertinentes": { "type": "array", "items": { "type": "string" } },
+          "treinamento_executado": { "type": "boolean" },
+          "plano_implementacao": { "type": "array", "items": { "type": "string" } },
+          "voe_criterios": { "type": "string" },
+          "voe_periodo": { "type": "string" },
+          "voe_resultados_esperados": { "type": "string" }
+        }
+      }
+    }
+  }
+}
