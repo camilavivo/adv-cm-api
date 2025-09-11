@@ -6,7 +6,7 @@ from typing import List, Optional
 from cm_filler import preencher_docx_from_payload
 
 API_KEY = os.getenv("CM_API_KEY")
-TEMPLATE_PATH = os.getenv("CM_TEMPLATE_PATH", "TESTE FORMULÁRIO CM.docx")
+TEMPLATE_PATH = os.getenv("CM_TEMPLATE_PATH", "TESTE_FORMULARIO_CM.docx")
 
 app = FastAPI(title="ADV CM Filler API",
               version="1.0.0",
