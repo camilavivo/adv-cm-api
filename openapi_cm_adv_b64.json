@@ -1,0 +1,197 @@
+{
+  "openapi": "3.0.1",
+  "info": {
+    "title": "ADV CM Filler API",
+    "version": "1.1.0"
+  },
+  "servers": [
+    {
+      "url": "https://adv-cm-api-1.onrender.com"
+    }
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "operationId": "health",
+        "summary": "Healthcheck",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/fill_b64": {
+      "post": {
+        "operationId": "preencherCMBase64",
+        "summary": "Preenche o formulário CM e retorna JSON com o DOCX em base64",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CMPayload"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "JSON contendo filename e filedata (base64 do DOCX)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "filename": {
+                      "type": "string",
+                      "example": "FORMULARIO_CM_PRENCHIDO.docx"
+                    },
+                    "filedata": {
+                      "type": "string",
+                      "description": "Arquivo DOCX em base64"
+                    }
+                  },
+                  "required": [
+                    "filename",
+                    "filedata"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API key inválida"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "ApiKeyAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "x-api-key"
+      }
+    },
+    "schemas": {
+      "CMPayload": {
+        "type": "object",
+        "required": [
+          "data",
+          "solicitante",
+          "departamento",
+          "situacao_atual",
+          "alteracao_proposta",
+          "abrangencia",
+          "classificacao",
+          "justificativa_classificacao"
+        ],
+        "properties": {
+          "data": {
+            "type": "string"
+          },
+          "solicitante": {
+            "type": "string"
+          },
+          "departamento": {
+            "type": "string"
+          },
+          "situacao_atual": {
+            "type": "string"
+          },
+          "alteracao_proposta": {
+            "type": "string"
+          },
+          "descricoes_itens": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "numeros_correspondentes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "abrangencia": {
+            "type": "string"
+          },
+          "titulo_mudanca": {
+            "type": "string"
+          },
+          "caracter_mudanca": {
+            "type": "string",
+            "enum": [
+              "Temporária",
+              "Definitiva"
+            ]
+          },
+          "retorno_mudanca_temp": {
+            "type": "string"
+          },
+          "mudanca_refere_se": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "impactos": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "classificacao": {
+            "type": "string",
+            "enum": [
+              "CRÍTICA",
+              "MAIOR",
+              "MENOR"
+            ]
+          },
+          "justificativa_classificacao": {
+            "type": "string"
+          },
+          "anexos_aplicaveis": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "departamentos_pertinentes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "treinamento_executado": {
+            "type": "boolean"
+          },
+          "plano_implementacao": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "voe_criterios": {
+            "type": "string"
+          },
+          "voe_periodo": {
+            "type": "string"
+          },
+          "voe_resultados_esperados": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}
