@@ -7,7 +7,7 @@ LABELS = {
     "DEPARTAMENTO": "DEPARTAMENTO",
     "TITULO": "TÍTULO MUDANÇA",
     "CARATER": "CARÁTER MUDANÇA",
-    "RETORNO": "RETORNO MUDANÇA TEMPORÁRIA",
+    "RETORNO": "RETORNO MUDANÇA",             # ← corrigido
     "SITUACAO": "SITUAÇÃO ATUAL",
     "ALTERACAO": "ALTERAÇÃO PROPOSTA",
     "JUST_MUD": "JUSTIFICATIVA MUDANÇA",
@@ -18,12 +18,12 @@ LABELS = {
     "IMPACTO": "POTENCIAL IMPACTO AVALIADO",
     "CLASSIF": "CLASSIFICAÇÃO DA CRITICIDADE",
     "JUST_CLASSIF": "JUSTIFICATIVA DA CLASSIFICAÇÃO",
-    "ANEXOS": "ANEXOS:",
+    "ANEXOS": "ANEXOS",                        # ← corrigido
     "PLANO": "PLANO DE IMPLEMENTAÇÃO",
     "TREIN": "EXECUÇÃO DO TREINAMENTO",
     "VOE": "VERIFICAÇÃO DE EFICÁCIA (VoE) PÓS IMPLEMENTAÇÃO",
     "RES_VOE": "RESULTADOS DA VoE",
-    "OBS": "Observações finais",
+    "OBS": "OBSERVAÇÕES FINAIS",              # ← corrigido
 }
 
 TODOS_SETORES_MODELO = [
@@ -66,7 +66,7 @@ def preencher_docx_from_payload(template_path: str, payload: dict) -> bytes:
     _set_cell_right_of_label(doc, LABELS["RETORNO"], payload.get("retorno_mudanca_temp") or "—")
     _set_cell_right_of_label(doc, LABELS["SITUACAO"], payload["situacao_atual"])
     _set_cell_right_of_label(doc, LABELS["ALTERACAO"], payload["alteracao_proposta"])
-    _set_cell_right_of_label(doc, LABELS["JUST_MUD"], "Problema → impacto → mitigação descritos na prévia.")
+    _set_cell_right_of_label(doc, LABELS["JUST_MUD"], payload.get("justificativa_mudanca","—"))
     _set_cell_right_of_label(doc, LABELS["DESC_ITEM"], join(payload.get("descricoes_itens")))
     _set_cell_right_of_label(doc, LABELS["NUM_CORR"], join(payload.get("numeros_correspondentes")))
     _set_cell_right_of_label(doc, LABELS["ABRANGENCIA"], payload["abrangencia"])
@@ -82,7 +82,7 @@ def preencher_docx_from_payload(template_path: str, payload: dict) -> bytes:
     _set_cell_right_of_label(doc, LABELS["VOE"],
         f"Critérios: {payload.get('voe_criterios','—')}\nPeríodo: {payload.get('voe_periodo','—')}")
     _set_cell_right_of_label(doc, LABELS["RES_VOE"], payload.get("voe_resultados_esperados","—"))
-    _set_cell_right_of_label(doc, LABELS["OBS"], "Encerrar após VoE e retorno/restabelecimento da condição original.")
+    _set_cell_right_of_label(doc, LABELS["OBS"], payload.get("observacoes_finais","Encerrar após VoE e retorno/restabelecimento da condição original."))
 
     from io import BytesIO
     buf = BytesIO()
