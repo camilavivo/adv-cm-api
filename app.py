@@ -6,14 +6,13 @@ from typing import List, Optional
 
 from fastapi import FastAPI, HTTPException, Header, Response, Request
 from pydantic import BaseModel, Field
-from starlette.staticfiles import StaticFiles  # <— para servir os arquivos gerados
+from starlette.staticfiles import StaticFiles
 
 from cm_filler import preencher_docx_from_payload
 
+# variáveis de ambiente (com defaults seguros)
 API_KEY = os.getenv("CM_API_KEY")
-TEMPLATE_PATH = os.getenv("CM_TEMPLATE_PATH", "TESTE_FORMULARIO_CM.docx")
-
-# pasta onde salvar os docx gerados
+TEMPLATE_PATH = os.getenv("CM_TEMPLATE_PATH", "/app/templates/Anexo 01 POP-NO-GQ-165_Rev13.docx")
 DOWNLOAD_DIR = os.getenv("CM_DOWNLOAD_DIR", "/app/downloads")
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
@@ -23,7 +22,7 @@ app = FastAPI(
     description="API que preenche o formulário CM e retorna o DOCX (binário, base64 e URL).",
 )
 
-# monta rota estática para baixar os arquivos gerados
+# rota estática para baixar arquivos gerados
 app.mount("/downloads", StaticFiles(directory=DOWNLOAD_DIR), name="downloads")
 
 
@@ -50,11 +49,12 @@ class CMPayload(BaseModel):
     voe_criterios: Optional[str] = ""
     voe_periodo: Optional[str] = ""
     voe_resultados_esperados: Optional[str] = ""
+    observacoes_finais: Optional[str] = ""
 
 
 def _check_api_key(x_api_key: Optional[str]):
     if not API_KEY:
-        return
+        return  # sem API key configurada, não exige
     if not x_api_key or x_api_key != API_KEY:
         raise HTTPException(status_code=401, detail="API key inválida")
 
@@ -70,7 +70,6 @@ def health():
     responses={200: {"content": {"application/vnd.openxmlformats-officedocument.wordprocessingml.document": {}}}},
 )
 def fill(payload: CMPayload, x_api_key: Optional[str] = Header(default=None)):
-    # resposta binária (opcional, mantida)
     _check_api_key(x_api_key)
     if not os.path.exists(TEMPLATE_PATH):
         raise HTTPException(status_code=500, detail=f"Template não encontrado: {TEMPLATE_PATH}")
@@ -85,7 +84,6 @@ def fill(payload: CMPayload, x_api_key: Optional[str] = Header(default=None)):
 
 @app.post("/fill_b64")
 def fill_b64(payload: CMPayload, x_api_key: Optional[str] = Header(default=None)):
-    # resposta em base64 (compatível com algumas integrações)
     import base64
     _check_api_key(x_api_key)
     if not os.path.exists(TEMPLATE_PATH):
@@ -98,8 +96,7 @@ def fill_b64(payload: CMPayload, x_api_key: Optional[str] = Header(default=None)
 @app.post("/fill_url")
 def fill_url(request: Request, payload: CMPayload, x_api_key: Optional[str] = Header(default=None)):
     """
-    Novo endpoint: salva o DOCX no servidor e retorna a URL pública para download.
-    Este é o melhor para o GPT gerar botão de download.
+    Salva o DOCX no servidor e retorna a URL pública para download.
     """
     _check_api_key(x_api_key)
     if not os.path.exists(TEMPLATE_PATH):
@@ -108,18 +105,17 @@ def fill_url(request: Request, payload: CMPayload, x_api_key: Optional[str] = He
     # gera o arquivo
     docx_bytes = preencher_docx_from_payload(TEMPLATE_PATH, payload.model_dump())
 
-    # nome único para não colidir
+    # nome único
     stamp = datetime.utcnow().strftime("%Y%m%d-%H%M%S")
     unique = uuid.uuid4().hex[:8]
     filename = f"FORMULARIO_CM_PRENCHIDO_{stamp}_{unique}.docx"
     filepath = os.path.join(DOWNLOAD_DIR, filename)
 
-    # grava no disco
+    # grava em disco
     with open(filepath, "wb") as f:
         f.write(docx_bytes)
 
-    # constrói URL pública
-    # ex: https://adv-cm-api-1.onrender.com/downloads/FORMULARIO_CM_PRENCHIDO_....docx
+    # URL pública
     base_url = str(request.base_url).rstrip("/")
     file_url = f"{base_url}/downloads/{filename}"
 
