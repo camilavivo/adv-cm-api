@@ -42,6 +42,10 @@ class CMPayload(BaseModel):
     impactos: List[str] = Field(default_factory=list)
     classificacao: str
     justificativa_classificacao: str
+
+    # novo campo: preenche "JUSTIFICATIVA MUDANÇA"
+    justificativa_mudanca: Optional[str] = ""
+
     anexos_aplicaveis: List[str] = Field(default_factory=list)
     departamentos_pertinentes: List[str] = Field(default_factory=list)
     treinamento_executado: Optional[bool] = None
