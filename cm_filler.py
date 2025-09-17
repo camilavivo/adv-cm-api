@@ -3,7 +3,7 @@ from docx import Document
 from docx.shared import Pt, RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 
-# ====== CONFIG PADRÃO DE FORMATAÇÃO ======
+# ====== PADRÕES DE FORMATAÇÃO ======
 FONT_NAME = "Arial"
 FONT_SIZE_PT = 9
 FONT_COLOR = RGBColor(89, 89, 89)  # Branco (Plano de Fundo 1), mais escuro 35%
@@ -11,7 +11,6 @@ FONT_COLOR = RGBColor(89, 89, 89)  # Branco (Plano de Fundo 1), mais escuro 35%
 def _format_paragraph(p):
     """Aplica alinhamento e fonte padrão ao parágrafo e seus runs."""
     p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-    # se não houver runs, cria um vazio para aplicar formato
     if not p.runs:
         r = p.add_run("")
         r.font.name = FONT_NAME
@@ -25,26 +24,29 @@ def _format_paragraph(p):
 
 def _write_cell_value(cell, value: str):
     """
-    Escreve na célula preservando nosso padrão:
-    - quebra value por '\n' e cria um parágrafo para cada linha
+    Escreve na célula com nosso padrão:
+    - quebra value por '\n' e cria parágrafos
     - aplica Arial 9, justificado, cor RGB(89,89,89)
     """
     if value is None:
         value = "—"
-    # limpa conteúdo mantendo a própria célula
-    # (cell.text = "" recria um parágrafo padrão; vamos formatá-lo)
     cell.text = ""
     lines = str(value).split("\n")
-    # o primeiro parágrafo já existe
+    # primeiro parágrafo (já existe)
     if lines:
-        cell.paragraphs[0].runs[0].text = lines[0] if cell.paragraphs[0].runs else lines[0]
+        if cell.paragraphs and cell.paragraphs[0].runs:
+            cell.paragraphs[0].runs[0].text = lines[0]
+        else:
+            p0 = cell.paragraphs[0] if cell.paragraphs else cell.add_paragraph("")
+            p0.add_run(lines[0])
         _format_paragraph(cell.paragraphs[0])
-        # linhas adicionais viram novos parágrafos
+        # demais linhas
         for ln in lines[1:]:
             p = cell.add_paragraph(ln)
             _format_paragraph(p)
     else:
-        # valor vazio — ainda assim formatar o parágrafo
+        if not cell.paragraphs:
+            cell.add_paragraph("")
         _format_paragraph(cell.paragraphs[0])
 
 LABELS = {
@@ -114,7 +116,7 @@ def preencher_docx_from_payload(template_path: str, payload: dict) -> bytes:
     _set_cell_right_of_label(doc, LABELS["RETORNO"], payload.get("retorno_mudanca_temp") or "—")
     _set_cell_right_of_label(doc, LABELS["SITUACAO"], payload["situacao_atual"])
     _set_cell_right_of_label(doc, LABELS["ALTERACAO"], payload["alteracao_proposta"])
-    # Justificativa da mudança — agora vem do payload
+    # 1) Justificativa da mudança — vem do payload
     _set_cell_right_of_label(doc, LABELS["JUST_MUD"], payload.get("justificativa_mudanca", "—"))
     _set_cell_right_of_label(doc, LABELS["DESC_ITEM"], join(payload.get("descricoes_itens")))
     _set_cell_right_of_label(doc, LABELS["NUM_CORR"], join(payload.get("numeros_correspondentes")))
@@ -125,13 +127,24 @@ def preencher_docx_from_payload(template_path: str, payload: dict) -> bytes:
     _set_cell_right_of_label(doc, LABELS["JUST_CLASSIF"], payload["justificativa_classificacao"])
     _set_cell_right_of_label(doc, LABELS["ANEXOS"], join(payload.get("anexos_aplicaveis")))
     _preencher_secao5(doc, payload.get("departamentos_pertinentes"))
-    _set_cell_right_of_label(doc, LABELS["PLANO"], join(payload.get("plano_implementacao")))
+
+    # 2) Plano de implementação numerado
+    plano = payload.get("plano_implementacao") or []
+    plano_numerado = "\n".join(f"{i+1}. {item}" for i, item in enumerate(plano)) if plano else "—"
+    _set_cell_right_of_label(doc, LABELS["PLANO"], plano_numerado)
+
     if "treinamento_executado" in payload and payload["treinamento_executado"] is not None:
         _set_cell_right_of_label(doc, LABELS["TREIN"], "Sim" if payload["treinamento_executado"] else "Não")
-    _set_cell_right_of_label(doc, LABELS["VOE"],
-        f"Critérios: {payload.get('voe_criterios','—')}\nPeríodo: {payload.get('voe_periodo','—')}")
+
+    _set_cell_right_of_label(
+        doc,
+        LABELS["VOE"],
+        f"Critérios: {payload.get('voe_criterios','—')}\nPeríodo: {payload.get('voe_periodo','—')}"
+    )
     _set_cell_right_of_label(doc, LABELS["RES_VOE"], payload.get("voe_resultados_esperados","—"))
-    _set_cell_right_of_label(doc, LABELS["OBS"], payload.get("observacoes_finais","Encerrar após VoE e retorno/restabelecimento da condição original."))
+
+    # 3) Observações finais em branco por padrão
+    _set_cell_right_of_label(doc, LABELS["OBS"], payload.get("observacoes_finais",""))
 
     from io import BytesIO
     buf = BytesIO()
