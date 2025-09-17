@@ -49,6 +49,25 @@ def _write_cell_value(cell, value: str):
             cell.add_paragraph("")
         _format_paragraph(cell.paragraphs[0])
 
+def _append_header_cm_number(doc: Document, numero_cm: str):
+    """
+    Adiciona um parágrafo no cabeçalho de TODAS as seções com 'CM nº: <numero_cm>',
+    aplicando Arial 9 e cor RGB(89,89,89), sem sobrescrever conteúdo existente.
+    """
+    if not numero_cm:
+        return
+    for section in doc.sections:
+        header = section.header
+        # cria um novo parágrafo (não mexe nos existentes)
+        p = header.add_paragraph(f"CM nº: {numero_cm}")
+        # alinhamento: por padrão deixamos JUSTIFY para manter padrão geral;
+        # se quiser à direita, troque para WD_ALIGN_PARAGRAPH.RIGHT
+        p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+        for r in p.runs:
+            r.font.name = FONT_NAME
+            r.font.size = Pt(FONT_SIZE_PT)
+            r.font.color.rgb = FONT_COLOR
+
 LABELS = {
     "DATA": "DATA",
     "SOLICITANTE": "SOLICITANTE",
@@ -108,6 +127,9 @@ def preencher_docx_from_payload(template_path: str, payload: dict) -> bytes:
     doc = Document(template_path)
     join = lambda xs: "\n".join(xs) if xs else "—"
 
+    # Cabeçalho: CM nº (se enviado)
+    _append_header_cm_number(doc, payload.get("numero_cm", "").strip())
+
     _set_cell_right_of_label(doc, LABELS["DATA"], payload["data"])
     _set_cell_right_of_label(doc, LABELS["SOLICITANTE"], payload["solicitante"])
     _set_cell_right_of_label(doc, LABELS["DEPARTAMENTO"], payload["departamento"])
@@ -127,6 +149,7 @@ def preencher_docx_from_payload(template_path: str, payload: dict) -> bytes:
     _set_cell_right_of_label(doc, LABELS["ANEXOS"], join(payload.get("anexos_aplicaveis")))
     _preencher_secao5(doc, payload.get("departamentos_pertinentes"))
 
+    # Plano de implementação numerado
     plano = payload.get("plano_implementacao") or []
     plano_numerado = "\n".join(f"{i+1}. {item}" for i, item in enumerate(plano)) if plano else "—"
     _set_cell_right_of_label(doc, LABELS["PLANO"], plano_numerado)
@@ -141,7 +164,7 @@ def preencher_docx_from_payload(template_path: str, payload: dict) -> bytes:
     )
     _set_cell_right_of_label(doc, LABELS["RES_VOE"], payload.get("voe_resultados_esperados","—"))
 
-    # Observações finais → sempre em branco se não enviado no payload
+    # Observações finais → em branco se não enviado
     _set_cell_right_of_label(doc, LABELS["OBS"], payload.get("observacoes_finais",""))
 
     from io import BytesIO
