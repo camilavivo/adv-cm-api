@@ -18,7 +18,7 @@ os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
 app = FastAPI(
     title="ADV CM Filler API",
-    version="1.2.0",
+    version="1.3.0",
     description="API que preenche o formulário CM e retorna o DOCX (binário, base64 e URL).",
 )
 
@@ -27,6 +27,10 @@ app.mount("/downloads", StaticFiles(directory=DOWNLOAD_DIR), name="downloads")
 
 
 class CMPayload(BaseModel):
+    # Cabeçalho
+    numero_cm: Optional[str] = None  # >>> novo: será impresso no cabeçalho como "CM nº: <valor>"
+
+    # Seção 1–3
     data: str
     solicitante: str
     departamento: str
@@ -42,10 +46,9 @@ class CMPayload(BaseModel):
     impactos: List[str] = Field(default_factory=list)
     classificacao: str
     justificativa_classificacao: str
+    justificativa_mudanca: Optional[str] = ""  # preenche "JUSTIFICATIVA MUDANÇA"
 
-    # novo campo: preenche "JUSTIFICATIVA MUDANÇA"
-    justificativa_mudanca: Optional[str] = ""
-
+    # Seção 4–7
     anexos_aplicaveis: List[str] = Field(default_factory=list)
     departamentos_pertinentes: List[str] = Field(default_factory=list)
     treinamento_executado: Optional[bool] = None
@@ -53,8 +56,7 @@ class CMPayload(BaseModel):
     voe_criterios: Optional[str] = ""
     voe_periodo: Optional[str] = ""
     voe_resultados_esperados: Optional[str] = ""
-    observacoes_finais: Optional[str] = ""
-
+    observacoes_finais: Optional[str] = ""     # vazio por padrão
 
 def _check_api_key(x_api_key: Optional[str]):
     if not API_KEY:
@@ -62,11 +64,9 @@ def _check_api_key(x_api_key: Optional[str]):
     if not x_api_key or x_api_key != API_KEY:
         raise HTTPException(status_code=401, detail="API key inválida")
 
-
 @app.get("/health")
 def health():
     return {"status": "ok"}
-
 
 @app.post(
     "/fill",
@@ -85,7 +85,6 @@ def fill(payload: CMPayload, x_api_key: Optional[str] = Header(default=None)):
         headers=headers,
     )
 
-
 @app.post("/fill_b64")
 def fill_b64(payload: CMPayload, x_api_key: Optional[str] = Header(default=None)):
     import base64
@@ -95,7 +94,6 @@ def fill_b64(payload: CMPayload, x_api_key: Optional[str] = Header(default=None)
     docx_bytes = preencher_docx_from_payload(TEMPLATE_PATH, payload.model_dump())
     b64 = base64.b64encode(docx_bytes).decode("utf-8")
     return {"filename": "FORMULARIO_CM_PRENCHIDO.docx", "filedata": b64}
-
 
 @app.post("/fill_url")
 def fill_url(request: Request, payload: CMPayload, x_api_key: Optional[str] = Header(default=None)):
