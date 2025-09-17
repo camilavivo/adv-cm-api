@@ -1,13 +1,26 @@
 {
-  "openapi": "3.1.0",
-  "info": { "title": "ADV CM Filler API", "version": "1.0.0" },
-  "servers": [{ "url": "https://SUA-URL-DA-API" }],
+  "openapi": "3.0.3",
+  "info": {
+    "title": "ADV CM Filler API",
+    "version": "1.3.0",
+    "description": "Preenche o Anexo 01 POP-NO-GQ-165 e devolve um link público para download do DOCX."
+  },
+  "servers": [
+    { "url": "https://adv-cm-api-1-vswc.onrender.com" }
+  ],
   "paths": {
-    "/fill": {
+    "/health": {
+      "get": {
+        "operationId": "health",
+        "summary": "Healthcheck",
+        "responses": { "200": { "description": "OK" } }
+      }
+    },
+    "/fill_url": {
       "post": {
-        "operationId": "preencherCM",
-        "summary": "Preenche o formulário CM e retorna o DOCX",
-        "security": [{ "ApiKeyAuth": [] }],
+        "operationId": "preencherCMUrl",
+        "summary": "Gera o DOCX e retorna URL pública para download",
+        "security": [ { "ApiKeyAuth": [] } ],
         "requestBody": {
           "required": true,
           "content": {
@@ -18,21 +31,23 @@
         },
         "responses": {
           "200": {
-            "description": "DOCX preenchido",
+            "description": "URL do arquivo gerado",
             "content": {
-              "application/vnd.openxmlformats-officedocument.wordprocessingml.document": {
-                "schema": { "type": "string", "format": "binary" }
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "filename": { "type": "string" },
+                    "fileUrl": { "type": "string", "format": "uri" }
+                  },
+                  "required": ["filename", "fileUrl"]
+                }
               }
             }
           },
-          "401": { "description": "API key inválida" }
+          "401": { "description": "API key inválida" },
+          "500": { "description": "Erro interno" }
         }
-      }
-    },
-    "/health": {
-      "get": {
-        "operationId": "health",
-        "responses": { "200": { "description": "OK" } }
       }
     }
   },
@@ -43,8 +58,21 @@
     "schemas": {
       "CMPayload": {
         "type": "object",
-        "required": ["data","solicitante","departamento","situacao_atual","alteracao_proposta","abrangencia","classificacao","justificativa_classificacao"],
+        "required": [
+          "data",
+          "solicitante",
+          "departamento",
+          "situacao_atual",
+          "alteracao_proposta",
+          "abrangencia",
+          "classificacao",
+          "justificativa_classificacao"
+        ],
         "properties": {
+          "numero_cm": {
+            "type": "string",
+            "description": "Se informado, será impresso no cabeçalho (célula 'CM')."
+          },
           "data": { "type": "string" },
           "solicitante": { "type": "string" },
           "departamento": { "type": "string" },
@@ -60,13 +88,15 @@
           "impactos": { "type": "array", "items": { "type": "string" } },
           "classificacao": { "type": "string", "enum": ["CRÍTICA","MAIOR","MENOR"] },
           "justificativa_classificacao": { "type": "string" },
+          "justificativa_mudanca": { "type": "string" },
           "anexos_aplicaveis": { "type": "array", "items": { "type": "string" } },
           "departamentos_pertinentes": { "type": "array", "items": { "type": "string" } },
           "treinamento_executado": { "type": "boolean" },
           "plano_implementacao": { "type": "array", "items": { "type": "string" } },
           "voe_criterios": { "type": "string" },
           "voe_periodo": { "type": "string" },
-          "voe_resultados_esperados": { "type": "string" }
+          "voe_resultados_esperados": { "type": "string" },
+          "observacoes_finais": { "type": "string" }
         }
       }
     }
