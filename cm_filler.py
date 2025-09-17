@@ -29,7 +29,7 @@ def _write_cell_value(cell, value: str):
     - aplica Arial 9, justificado, cor RGB(89,89,89)
     """
     if value is None:
-        value = "—"
+        value = ""
     cell.text = ""
     lines = str(value).split("\n")
     # primeiro parágrafo (já existe)
@@ -116,7 +116,6 @@ def preencher_docx_from_payload(template_path: str, payload: dict) -> bytes:
     _set_cell_right_of_label(doc, LABELS["RETORNO"], payload.get("retorno_mudanca_temp") or "—")
     _set_cell_right_of_label(doc, LABELS["SITUACAO"], payload["situacao_atual"])
     _set_cell_right_of_label(doc, LABELS["ALTERACAO"], payload["alteracao_proposta"])
-    # 1) Justificativa da mudança — vem do payload
     _set_cell_right_of_label(doc, LABELS["JUST_MUD"], payload.get("justificativa_mudanca", "—"))
     _set_cell_right_of_label(doc, LABELS["DESC_ITEM"], join(payload.get("descricoes_itens")))
     _set_cell_right_of_label(doc, LABELS["NUM_CORR"], join(payload.get("numeros_correspondentes")))
@@ -128,7 +127,6 @@ def preencher_docx_from_payload(template_path: str, payload: dict) -> bytes:
     _set_cell_right_of_label(doc, LABELS["ANEXOS"], join(payload.get("anexos_aplicaveis")))
     _preencher_secao5(doc, payload.get("departamentos_pertinentes"))
 
-    # 2) Plano de implementação numerado
     plano = payload.get("plano_implementacao") or []
     plano_numerado = "\n".join(f"{i+1}. {item}" for i, item in enumerate(plano)) if plano else "—"
     _set_cell_right_of_label(doc, LABELS["PLANO"], plano_numerado)
@@ -143,7 +141,7 @@ def preencher_docx_from_payload(template_path: str, payload: dict) -> bytes:
     )
     _set_cell_right_of_label(doc, LABELS["RES_VOE"], payload.get("voe_resultados_esperados","—"))
 
-    # 3) Observações finais em branco por padrão
+    # Observações finais → sempre em branco se não enviado no payload
     _set_cell_right_of_label(doc, LABELS["OBS"], payload.get("observacoes_finais",""))
 
     from io import BytesIO
