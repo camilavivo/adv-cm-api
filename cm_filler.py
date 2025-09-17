@@ -3,70 +3,84 @@ from docx import Document
 from docx.shared import Pt, RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 
-# ====== PADRÕES DE FORMATAÇÃO ======
-FONT_NAME = "Arial"
-FONT_SIZE_PT = 9
-FONT_COLOR = RGBColor(89, 89, 89)  # Branco (Plano de Fundo 1), mais escuro 35%
+# ====== PADRÕES DE FORMATAÇÃO (tabela do formulário) ======
+FORM_FONT_NAME = "Arial"
+FORM_FONT_SIZE_PT = 9
+FORM_FONT_COLOR = RGBColor(89, 89, 89)  # Branco (Plano de Fundo 1) – mais escuro 35%
 
-def _format_paragraph(p):
-    """Aplica alinhamento e fonte padrão ao parágrafo e seus runs."""
-    p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+# ====== PADRÕES DE FORMATAÇÃO (cabeçalho: campo CM) ======
+HDR_FONT_NAME = "Arial"
+HDR_FONT_SIZE_PT = 11
+HDR_FONT_COLOR = RGBColor(0, 0, 0)  # preto
+
+def _format_paragraph(p, *, name, size_pt, color_rgb, align=WD_ALIGN_PARAGRAPH.JUSTIFY):
+    """Aplica alinhamento e fonte ao parágrafo e seus runs."""
+    p.alignment = align
     if not p.runs:
         r = p.add_run("")
-        r.font.name = FONT_NAME
-        r.font.size = Pt(FONT_SIZE_PT)
-        r.font.color.rgb = FONT_COLOR
+        r.font.name = name
+        r.font.size = Pt(size_pt)
+        r.font.color.rgb = color_rgb
         return
     for r in p.runs:
-        r.font.name = FONT_NAME
-        r.font.size = Pt(FONT_SIZE_PT)
-        r.font.color.rgb = FONT_COLOR
+        r.font.name = name
+        r.font.size = Pt(size_pt)
+        r.font.color.rgb = color_rgb
 
 def _write_cell_value(cell, value: str):
     """
-    Escreve na célula com nosso padrão:
-    - quebra value por '\n' e cria parágrafos
-    - aplica Arial 9, justificado, cor RGB(89,89,89)
+    Escreve na célula da TABELA do formulário:
+    - quebra em linhas por '\n'
+    - Arial 9, justificado, cor RGB(89,89,89)
     """
     if value is None:
         value = ""
     cell.text = ""
     lines = str(value).split("\n")
-    # primeiro parágrafo (já existe)
     if lines:
         if cell.paragraphs and cell.paragraphs[0].runs:
             cell.paragraphs[0].runs[0].text = lines[0]
         else:
             p0 = cell.paragraphs[0] if cell.paragraphs else cell.add_paragraph("")
             p0.add_run(lines[0])
-        _format_paragraph(cell.paragraphs[0])
-        # demais linhas
+        _format_paragraph(cell.paragraphs[0],
+                          name=FORM_FONT_NAME, size_pt=FORM_FONT_SIZE_PT, color_rgb=FORM_FONT_COLOR)
         for ln in lines[1:]:
             p = cell.add_paragraph(ln)
-            _format_paragraph(p)
+            _format_paragraph(p,
+                              name=FORM_FONT_NAME, size_pt=FORM_FONT_SIZE_PT, color_rgb=FORM_FONT_COLOR)
     else:
         if not cell.paragraphs:
             cell.add_paragraph("")
-        _format_paragraph(cell.paragraphs[0])
+        _format_paragraph(cell.paragraphs[0],
+                          name=FORM_FONT_NAME, size_pt=FORM_FONT_SIZE_PT, color_rgb=FORM_FONT_COLOR)
 
-def _append_header_cm_number(doc: Document, numero_cm: str):
+def _write_header_cm_in_place(doc: Document, numero_cm: str):
     """
-    Adiciona um parágrafo no cabeçalho de TODAS as seções com 'CM nº: <numero_cm>',
-    aplicando Arial 9 e cor RGB(89,89,89), sem sobrescrever conteúdo existente.
+    Procura no CABEÇALHO a célula cujo texto é 'CM' (ou 'CMI') e
+    substitui pelo número informado, em Arial 11, justificado, cor preta.
+    Não mexe nas demais células/linhas do cabeçalho.
     """
     if not numero_cm:
         return
+    target_labels = {"CM", "CMI"}
     for section in doc.sections:
         header = section.header
-        # cria um novo parágrafo (não mexe nos existentes)
-        p = header.add_paragraph(f"CM nº: {numero_cm}")
-        # alinhamento: por padrão deixamos JUSTIFY para manter padrão geral;
-        # se quiser à direita, troque para WD_ALIGN_PARAGRAPH.RIGHT
-        p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-        for r in p.runs:
-            r.font.name = FONT_NAME
-            r.font.size = Pt(FONT_SIZE_PT)
-            r.font.color.rgb = FONT_COLOR
+        for tbl in header.tables:
+            for row in tbl.rows:
+                for cell in row.cells:
+                    text = cell.text.strip().upper()
+                    if text in target_labels:
+                        # Substitui o conteúdo da célula
+                        cell.text = str(numero_cm)
+                        # Formata todos os parágrafos da célula
+                        for p in cell.paragraphs:
+                            _format_paragraph(p,
+                                              name=HDR_FONT_NAME,
+                                              size_pt=HDR_FONT_SIZE_PT,
+                                              color_rgb=HDR_FONT_COLOR,
+                                              align=WD_ALIGN_PARAGRAPH.JUSTIFY)
+                        return  # encontrado uma vez, pode sair
 
 LABELS = {
     "DATA": "DATA",
@@ -74,10 +88,10 @@ LABELS = {
     "DEPARTAMENTO": "DEPARTAMENTO",
     "TITULO": "TÍTULO MUDANÇA",
     "CARATER": "CARÁTER MUDANÇA",
-    "RETORNO": "RETORNO MUDANÇA",             # Rev.13
+    "RETORNO": "RETORNO MUDANÇA",
     "SITUACAO": "SITUAÇÃO ATUAL",
     "ALTERACAO": "ALTERAÇÃO PROPOSTA",
-    "JUST_MUD": "JUSTIFICATIVA MUDANÇA",      # Rev.13
+    "JUST_MUD": "JUSTIFICATIVA MUDANÇA",
     "DESC_ITEM": "DESCRIÇÃO ITEM",
     "NUM_CORR": "NÚMERO CORRESPONDENTE",
     "ABRANGENCIA": "ABRANGÊNCIA DA MUDANÇA",
@@ -85,12 +99,12 @@ LABELS = {
     "IMPACTO": "POTENCIAL IMPACTO AVALIADO",
     "CLASSIF": "CLASSIFICAÇÃO DA CRITICIDADE",
     "JUST_CLASSIF": "JUSTIFICATIVA DA CLASSIFICAÇÃO",
-    "ANEXOS": "ANEXOS",                        # Rev.13
+    "ANEXOS": "ANEXOS",
     "PLANO": "PLANO DE IMPLEMENTAÇÃO",
     "TREIN": "EXECUÇÃO DO TREINAMENTO",
     "VOE": "VERIFICAÇÃO DE EFICÁCIA (VoE) PÓS IMPLEMENTAÇÃO",
     "RES_VOE": "RESULTADOS DA VoE",
-    "OBS": "OBSERVAÇÕES FINAIS",              # Rev.13
+    "OBS": "OBSERVAÇÕES FINAIS",
 }
 
 TODOS_SETORES_MODELO = [
@@ -102,7 +116,6 @@ TODOS_SETORES_MODELO = [
 OBRIGATORIOS_SECAO5 = {"Farmacêutico Responsável","Diretoria ou Conselho","Regulatório"}
 
 def _set_cell_right_of_label(doc: Document, label: str, value: str) -> bool:
-    """Localiza a linha cujo 1º campo corresponde ao label e escreve no 2º campo com formatação padrão."""
     lab_upper = label.strip().upper()
     for table in doc.tables:
         for row in table.rows:
@@ -113,7 +126,6 @@ def _set_cell_right_of_label(doc: Document, label: str, value: str) -> bool:
     return False
 
 def _preencher_secao5(doc: Document, departamentos_pertinentes):
-    """Marca 'Não aplicável' para departamentos não pertinentes na Seção 5, aplicando formatação padrão."""
     pertinentes = set(OBRIGATORIOS_SECAO5 | set(departamentos_pertinentes or []))
     for table in doc.tables:
         for row in table.rows:
@@ -127,9 +139,10 @@ def preencher_docx_from_payload(template_path: str, payload: dict) -> bytes:
     doc = Document(template_path)
     join = lambda xs: "\n".join(xs) if xs else "—"
 
-    # Cabeçalho: CM nº (se enviado)
-    _append_header_cm_number(doc, payload.get("numero_cm", "").strip())
+    # >>> Cabeçalho: escreve o número do CM na célula 'CM'
+    _write_header_cm_in_place(doc, payload.get("numero_cm", "") or "")
 
+    # Seções 1–3
     _set_cell_right_of_label(doc, LABELS["DATA"], payload["data"])
     _set_cell_right_of_label(doc, LABELS["SOLICITANTE"], payload["solicitante"])
     _set_cell_right_of_label(doc, LABELS["DEPARTAMENTO"], payload["departamento"])
@@ -139,6 +152,8 @@ def preencher_docx_from_payload(template_path: str, payload: dict) -> bytes:
     _set_cell_right_of_label(doc, LABELS["SITUACAO"], payload["situacao_atual"])
     _set_cell_right_of_label(doc, LABELS["ALTERACAO"], payload["alteracao_proposta"])
     _set_cell_right_of_label(doc, LABELS["JUST_MUD"], payload.get("justificativa_mudanca", "—"))
+
+    # Seção 3
     _set_cell_right_of_label(doc, LABELS["DESC_ITEM"], join(payload.get("descricoes_itens")))
     _set_cell_right_of_label(doc, LABELS["NUM_CORR"], join(payload.get("numeros_correspondentes")))
     _set_cell_right_of_label(doc, LABELS["ABRANGENCIA"], payload["abrangencia"])
@@ -146,10 +161,14 @@ def preencher_docx_from_payload(template_path: str, payload: dict) -> bytes:
     _set_cell_right_of_label(doc, LABELS["IMPACTO"], join(payload.get("impactos")))
     _set_cell_right_of_label(doc, LABELS["CLASSIF"], payload["classificacao"])
     _set_cell_right_of_label(doc, LABELS["JUST_CLASSIF"], payload["justificativa_classificacao"])
+
+    # Seção 4
     _set_cell_right_of_label(doc, LABELS["ANEXOS"], join(payload.get("anexos_aplicaveis")))
+
+    # Seção 5
     _preencher_secao5(doc, payload.get("departamentos_pertinentes"))
 
-    # Plano de implementação numerado
+    # Seção 6
     plano = payload.get("plano_implementacao") or []
     plano_numerado = "\n".join(f"{i+1}. {item}" for i, item in enumerate(plano)) if plano else "—"
     _set_cell_right_of_label(doc, LABELS["PLANO"], plano_numerado)
@@ -158,13 +177,12 @@ def preencher_docx_from_payload(template_path: str, payload: dict) -> bytes:
         _set_cell_right_of_label(doc, LABELS["TREIN"], "Sim" if payload["treinamento_executado"] else "Não")
 
     _set_cell_right_of_label(
-        doc,
-        LABELS["VOE"],
+        doc, LABELS["VOE"],
         f"Critérios: {payload.get('voe_criterios','—')}\nPeríodo: {payload.get('voe_periodo','—')}"
     )
     _set_cell_right_of_label(doc, LABELS["RES_VOE"], payload.get("voe_resultados_esperados","—"))
 
-    # Observações finais → em branco se não enviado
+    # Seção 7
     _set_cell_right_of_label(doc, LABELS["OBS"], payload.get("observacoes_finais",""))
 
     from io import BytesIO
