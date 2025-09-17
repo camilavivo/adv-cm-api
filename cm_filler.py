@@ -2,6 +2,7 @@
 from docx import Document
 from docx.shared import Pt, RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH
+from datetime import datetime
 
 # ====== PADRÕES DE FORMATAÇÃO (tabela do formulário) ======
 FORM_FONT_NAME = "Arial"
@@ -71,16 +72,40 @@ def _write_header_cm_in_place(doc: Document, numero_cm: str):
                 for cell in row.cells:
                     text = cell.text.strip().upper()
                     if text in target_labels:
-                        # Substitui o conteúdo da célula
                         cell.text = str(numero_cm)
-                        # Formata todos os parágrafos da célula
                         for p in cell.paragraphs:
-                            _format_paragraph(p,
-                                              name=HDR_FONT_NAME,
-                                              size_pt=HDR_FONT_SIZE_PT,
-                                              color_rgb=HDR_FONT_COLOR,
-                                              align=WD_ALIGN_PARAGRAPH.JUSTIFY)
+                            _format_paragraph(
+                                p,
+                                name=HDR_FONT_NAME,
+                                size_pt=HDR_FONT_SIZE_PT,
+                                color_rgb=HDR_FONT_COLOR,
+                                align=WD_ALIGN_PARAGRAPH.JUSTIFY,
+                            )
                         return  # encontrado uma vez, pode sair
+
+def _format_date_ddmmyyyy(value: str) -> str:
+    """
+    Retorna a data em dd/mm/aaaa.
+    Aceita:
+      - 'aaaa-mm-dd' (ISO) -> converte
+      - 'dd/mm/aaaa'       -> mantém
+    Outros formatos: retorna como veio.
+    """
+    if not value:
+        return ""
+    v = value.strip()
+    # já no formato correto?
+    try:
+        dt = datetime.strptime(v, "%d/%m/%Y")
+        return dt.strftime("%d/%m/%Y")
+    except Exception:
+        pass
+    # ISO 'aaaa-mm-dd' -> converter
+    try:
+        dt = datetime.strptime(v, "%Y-%m-%d")
+        return dt.strftime("%d/%m/%Y")
+    except Exception:
+        return v  # mantém como veio
 
 LABELS = {
     "DATA": "DATA",
@@ -143,7 +168,10 @@ def preencher_docx_from_payload(template_path: str, payload: dict) -> bytes:
     _write_header_cm_in_place(doc, payload.get("numero_cm", "") or "")
 
     # Seções 1–3
-    _set_cell_right_of_label(doc, LABELS["DATA"], payload["data"])
+    # DATA com conversão automática para dd/mm/aaaa
+    data_fmt = _format_date_ddmmyyyy(payload.get("data", ""))
+    _set_cell_right_of_label(doc, LABELS["DATA"], data_fmt)
+
     _set_cell_right_of_label(doc, LABELS["SOLICITANTE"], payload["solicitante"])
     _set_cell_right_of_label(doc, LABELS["DEPARTAMENTO"], payload["departamento"])
     _set_cell_right_of_label(doc, LABELS["TITULO"], payload.get("titulo_mudanca") or "—")
