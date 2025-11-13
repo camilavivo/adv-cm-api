@@ -1,69 +1,64 @@
 # -*- coding: utf-8 -*-
+"""
+Módulo responsável por preencher o Formulário de Controle de Mudanças (Anexo 01 POP-NO-GQ-165 Rev.13)
+em conformidade com BPF e formatação padrão da ADV Farma.
+"""
+
+from io import BytesIO
+from datetime import datetime
 from docx import Document
 from docx.shared import Pt, RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH
-from datetime import datetime
 
-# ====== PADRÕES DE FORMATAÇÃO (tabela do formulário) ======
+# ====== PADRÕES DE FORMATAÇÃO ======
 FORM_FONT_NAME = "Arial"
 FORM_FONT_SIZE_PT = 9
-FORM_FONT_COLOR = RGBColor(89, 89, 89)  # Branco (Plano de Fundo 1) – mais escuro 35%
+FORM_FONT_COLOR = RGBColor(89, 89, 89)  # Cinza padrão (Plano de Fundo 1 – mais escuro 35%)
 
-# ====== PADRÕES DE FORMATAÇÃO (cabeçalho: campo CM) ======
 HDR_FONT_NAME = "Arial"
 HDR_FONT_SIZE_PT = 11
-HDR_FONT_COLOR = RGBColor(0, 0, 0)  # preto
+HDR_FONT_COLOR = RGBColor(0, 0, 0)  # Preto
+
+# ==============================================================
+# FUNÇÕES DE APOIO – FORMATAÇÃO E ESCRITA
+# ==============================================================
 
 def _format_paragraph(p, *, name, size_pt, color_rgb, align=WD_ALIGN_PARAGRAPH.JUSTIFY):
     """Aplica alinhamento e fonte ao parágrafo e seus runs."""
     p.alignment = align
-    if not p.runs:
-        r = p.add_run("")
+    for r in (p.runs or [p.add_run("")]):
         r.font.name = name
         r.font.size = Pt(size_pt)
         r.font.color.rgb = color_rgb
-        return
-    for r in p.runs:
-        r.font.name = name
-        r.font.size = Pt(size_pt)
-        r.font.color.rgb = color_rgb
+
 
 def _write_cell_value(cell, value: str):
     """
-    Escreve na célula da TABELA do formulário:
-    - quebra em linhas por '\n'
+    Escreve texto em uma célula da TABELA do formulário:
+    - Quebra em linhas por '\n'
     - Arial 9, justificado, cor RGB(89,89,89)
     """
-    if value is None:
-        value = ""
+    value = str(value or "").strip()
     cell.text = ""
-    lines = str(value).split("\n")
-    if lines:
-        if cell.paragraphs and cell.paragraphs[0].runs:
-            cell.paragraphs[0].runs[0].text = lines[0]
+    lines = value.split("\n") if value else ["—"]
+
+    for i, ln in enumerate(lines):
+        p = cell.paragraphs[i] if i < len(cell.paragraphs) else cell.add_paragraph("")
+        if not p.runs:
+            p.add_run(ln)
         else:
-            p0 = cell.paragraphs[0] if cell.paragraphs else cell.add_paragraph("")
-            p0.add_run(lines[0])
-        _format_paragraph(cell.paragraphs[0],
-                          name=FORM_FONT_NAME, size_pt=FORM_FONT_SIZE_PT, color_rgb=FORM_FONT_COLOR)
-        for ln in lines[1:]:
-            p = cell.add_paragraph(ln)
-            _format_paragraph(p,
-                              name=FORM_FONT_NAME, size_pt=FORM_FONT_SIZE_PT, color_rgb=FORM_FONT_COLOR)
-    else:
-        if not cell.paragraphs:
-            cell.add_paragraph("")
-        _format_paragraph(cell.paragraphs[0],
-                          name=FORM_FONT_NAME, size_pt=FORM_FONT_SIZE_PT, color_rgb=FORM_FONT_COLOR)
+            p.runs[0].text = ln
+        _format_paragraph(p, name=FORM_FONT_NAME, size_pt=FORM_FONT_SIZE_PT, color_rgb=FORM_FONT_COLOR)
+
 
 def _write_header_cm_in_place(doc: Document, numero_cm: str):
     """
-    Procura no CABEÇALHO a célula cujo texto é 'CM' (ou 'CMI') e
-    substitui pelo número informado, em Arial 11, justificado, cor preta.
-    Não mexe nas demais células/linhas do cabeçalho.
+    Procura no CABEÇALHO a célula cujo texto é 'CM' (ou 'CMI')
+    e substitui pelo número informado (Arial 11, preto, justificado).
     """
     if not numero_cm:
         return
+
     target_labels = {"CM", "CMI"}
     for section in doc.sections:
         header = section.header
@@ -81,31 +76,26 @@ def _write_header_cm_in_place(doc: Document, numero_cm: str):
                                 color_rgb=HDR_FONT_COLOR,
                                 align=WD_ALIGN_PARAGRAPH.JUSTIFY,
                             )
-                        return  # encontrado uma vez, pode sair
+                        return  # encontrado uma vez, encerra
+
 
 def _format_date_ddmmyyyy(value: str) -> str:
-    """
-    Retorna a data em dd/mm/aaaa.
-    Aceita:
-      - 'aaaa-mm-dd' (ISO) -> converte
-      - 'dd/mm/aaaa'       -> mantém
-    Outros formatos: retorna como veio.
-    """
+    """Converte datas ISO (aaaa-mm-dd) para dd/mm/aaaa."""
     if not value:
-        return ""
+        return "—"
     v = value.strip()
-    # já no formato correto?
-    try:
-        dt = datetime.strptime(v, "%d/%m/%Y")
-        return dt.strftime("%d/%m/%Y")
-    except Exception:
-        pass
-    # ISO 'aaaa-mm-dd' -> converter
-    try:
-        dt = datetime.strptime(v, "%Y-%m-%d")
-        return dt.strftime("%d/%m/%Y")
-    except Exception:
-        return v  # mantém como veio
+    for fmt in ("%d/%m/%Y", "%Y-%m-%d"):
+        try:
+            dt = datetime.strptime(v, fmt)
+            return dt.strftime("%d/%m/%Y")
+        except Exception:
+            continue
+    return v
+
+
+# ==============================================================
+# MAPAS DE CAMPOS (labels)
+# ==============================================================
 
 LABELS = {
     "DATA": "DATA",
@@ -140,7 +130,13 @@ TODOS_SETORES_MODELO = [
 ]
 OBRIGATORIOS_SECAO5 = {"Farmacêutico Responsável","Diretoria ou Conselho","Regulatório"}
 
+
+# ==============================================================
+# FUNÇÕES PRINCIPAIS DE PREENCHIMENTO
+# ==============================================================
+
 def _set_cell_right_of_label(doc: Document, label: str, value: str) -> bool:
+    """Procura a linha com o label informado e preenche a célula à direita."""
     lab_upper = label.strip().upper()
     for table in doc.tables:
         for row in table.rows:
@@ -150,7 +146,9 @@ def _set_cell_right_of_label(doc: Document, label: str, value: str) -> bool:
                 return True
     return False
 
+
 def _preencher_secao5(doc: Document, departamentos_pertinentes):
+    """Preenche a seção 5 com 'Não aplicável' nos setores não pertinentes."""
     pertinentes = set(OBRIGATORIOS_SECAO5 | set(departamentos_pertinentes or []))
     for table in doc.tables:
         for row in table.rows:
@@ -160,60 +158,62 @@ def _preencher_secao5(doc: Document, departamentos_pertinentes):
                     _write_cell_value(row.cells[1], "Não aplicável")
                     _write_cell_value(row.cells[2], "Não aplicável")
 
+
 def preencher_docx_from_payload(template_path: str, payload: dict) -> bytes:
+    """Função principal: preenche o template DOCX e retorna o binário do arquivo."""
     doc = Document(template_path)
     join = lambda xs: "\n".join(xs) if xs else "—"
 
-    # >>> Cabeçalho: escreve o número do CM na célula 'CM'
+    # ====== Cabeçalho ======
     _write_header_cm_in_place(doc, payload.get("numero_cm", "") or "")
 
-    # Seções 1–3
-    # DATA com conversão automática para dd/mm/aaaa
-    data_fmt = _format_date_ddmmyyyy(payload.get("data", ""))
-    _set_cell_right_of_label(doc, LABELS["DATA"], data_fmt)
-
-    _set_cell_right_of_label(doc, LABELS["SOLICITANTE"], payload["solicitante"])
-    _set_cell_right_of_label(doc, LABELS["DEPARTAMENTO"], payload["departamento"])
-    _set_cell_right_of_label(doc, LABELS["TITULO"], payload.get("titulo_mudanca") or "—")
-    _set_cell_right_of_label(doc, LABELS["CARATER"], payload.get("caracter_mudanca","Temporária"))
-    _set_cell_right_of_label(doc, LABELS["RETORNO"], payload.get("retorno_mudanca_temp") or "—")
-    _set_cell_right_of_label(doc, LABELS["SITUACAO"], payload["situacao_atual"])
-    _set_cell_right_of_label(doc, LABELS["ALTERACAO"], payload["alteracao_proposta"])
+    # ====== Seções 1 a 3 ======
+    _set_cell_right_of_label(doc, LABELS["DATA"], _format_date_ddmmyyyy(payload.get("data", "")))
+    _set_cell_right_of_label(doc, LABELS["SOLICITANTE"], payload.get("solicitante", "—"))
+    _set_cell_right_of_label(doc, LABELS["DEPARTAMENTO"], payload.get("departamento", "—"))
+    _set_cell_right_of_label(doc, LABELS["TITULO"], payload.get("titulo_mudanca", "—"))
+    _set_cell_right_of_label(doc, LABELS["CARATER"], payload.get("caracter_mudanca", "Temporária"))
+    _set_cell_right_of_label(doc, LABELS["RETORNO"], payload.get("retorno_mudanca_temp", "—"))
+    _set_cell_right_of_label(doc, LABELS["SITUACAO"], payload.get("situacao_atual", "—"))
+    _set_cell_right_of_label(doc, LABELS["ALTERACAO"], payload.get("alteracao_proposta", "—"))
     _set_cell_right_of_label(doc, LABELS["JUST_MUD"], payload.get("justificativa_mudanca", "—"))
 
-    # Seção 3
+    # ====== Seção 3 ======
     _set_cell_right_of_label(doc, LABELS["DESC_ITEM"], join(payload.get("descricoes_itens")))
     _set_cell_right_of_label(doc, LABELS["NUM_CORR"], join(payload.get("numeros_correspondentes")))
-    _set_cell_right_of_label(doc, LABELS["ABRANGENCIA"], payload["abrangencia"])
+    _set_cell_right_of_label(doc, LABELS["ABRANGENCIA"], payload.get("abrangencia", "—"))
     _set_cell_right_of_label(doc, LABELS["REFERE"], join(payload.get("mudanca_refere_se")))
     _set_cell_right_of_label(doc, LABELS["IMPACTO"], join(payload.get("impactos")))
-    _set_cell_right_of_label(doc, LABELS["CLASSIF"], payload["classificacao"])
-    _set_cell_right_of_label(doc, LABELS["JUST_CLASSIF"], payload["justificativa_classificacao"])
+    _set_cell_right_of_label(doc, LABELS["CLASSIF"], payload.get("classificacao", "—"))
+    _set_cell_right_of_label(doc, LABELS["JUST_CLASSIF"], payload.get("justificativa_classificacao", "—"))
 
-    # Seção 4
+    # ====== Seção 4 ======
     _set_cell_right_of_label(doc, LABELS["ANEXOS"], join(payload.get("anexos_aplicaveis")))
 
-    # Seção 5
+    # ====== Seção 5 ======
     _preencher_secao5(doc, payload.get("departamentos_pertinentes"))
 
-    # Seção 6
+    # ====== Seção 6 ======
     plano = payload.get("plano_implementacao") or []
     plano_numerado = "\n".join(f"{i+1}. {item}" for i, item in enumerate(plano)) if plano else "—"
     _set_cell_right_of_label(doc, LABELS["PLANO"], plano_numerado)
 
-    if "treinamento_executado" in payload and payload["treinamento_executado"] is not None:
-        _set_cell_right_of_label(doc, LABELS["TREIN"], "Sim" if payload["treinamento_executado"] else "Não")
+    if payload.get("treinamento_executado") is not None:
+        _set_cell_right_of_label(
+            doc, LABELS["TREIN"],
+            "Sim" if payload.get("treinamento_executado") else "Não"
+        )
 
     _set_cell_right_of_label(
         doc, LABELS["VOE"],
         f"Critérios: {payload.get('voe_criterios','—')}\nPeríodo: {payload.get('voe_periodo','—')}"
     )
-    _set_cell_right_of_label(doc, LABELS["RES_VOE"], payload.get("voe_resultados_esperados","—"))
+    _set_cell_right_of_label(doc, LABELS["RES_VOE"], payload.get("voe_resultados_esperados", "—"))
 
-    # Seção 7
-    _set_cell_right_of_label(doc, LABELS["OBS"], payload.get("observacoes_finais",""))
+    # ====== Seção 7 ======
+    _set_cell_right_of_label(doc, LABELS["OBS"], payload.get("observacoes_finais", ""))
 
-    from io import BytesIO
+    # ====== Retorno ======
     buf = BytesIO()
     doc.save(buf)
     return buf.getvalue()
