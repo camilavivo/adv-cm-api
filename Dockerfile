@@ -9,7 +9,7 @@ COPY templates/ /app/templates/
 
 RUN mkdir -p /app/downloads
 
-ENV CM_TEMPLATE_PATH="/app/templates/Anexo 01 POP-NO-GQ-165_Rev13.doc"
+ENV CM_TEMPLATE_PATH="/app/templates/Anexo 01 POP-NO-GQ-165_Rev13.docx"
 ENV CM_DOWNLOAD_DIR="/app/downloads"
 ENV CM_API_KEY=""
 
